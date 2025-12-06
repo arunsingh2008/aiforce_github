@@ -1,0 +1,145 @@
+WITH RDU_Highest_Facility AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (PARTITION BY SRC_DL, AR_ID ORDER BY SRC_DL, AR_ID) AS row_num
+    FROM
+        V438S0P1
+    QUALIFY
+        row_num = 1
+),
+JNO_FCY_AR_LWST_HGHST AS (
+    SELECT
+        a.*,
+        b.*
+    FROM
+        V438S1P1 a
+    LEFT JOIN
+        V438S1P2 b
+    ON
+        a.SRC_DL = b.SRC_DL AND a.AR_ID = b.AR_ID
+),
+XFM_HIGHEST_FACILITY AS (
+    SELECT
+        mov_AR_X_R_HIGHEST.HIGHEST_FCY_ID AS AR_ID,
+        'Y' AS HIGHEST_FCY_IN_HRY
+    FROM
+        V438S2P1 mov_AR_X_R_HIGHEST
+),
+SRT_AR_X_R_HIGHEST AS (
+    SELECT
+        *
+    FROM
+        V438S3P1
+    ORDER BY
+        SRC_DL, AR_ID
+),
+ORA_write_EWM_MDM_STAGE_FACILITY AS (
+    -- This CTE is a placeholder for the Oracle write operation
+    SELECT
+        *
+    FROM
+        V438S4P1
+),
+ORA_read_EWM_MDM_STAGE_FCY_AR_IP_JDCL_EV AS (
+    SELECT 
+        SRC_DL,
+        DATA_DT,
+        VLD_FROM_TMS,
+        VLD_TO_TMS,
+        SRC_STM_ID,
+        FCY_ID,
+        FCY_RK,
+        AR_ID,
+        FCY_AR_TP,
+        COURT_CTRLD_WRKOUT_FCY,
+        OUT_OF_COURT_WRKOUT_FCY,
+        COURT_CTRLD_WRKOUT_FILL_DT,
+        COURT_CTRLD_WRKOUT_CLS_DT,
+        CR_OBLG_DFLTD,
+        UNDRL_AR_ID
+    FROM
+        #XG_PS_RDB_DM_MPSCR_Database.$XG_RDB_DM_SCHEMA_MPSCR#.EWM_MDM_STAGE_FCY_AR_IP_JDCL
+    WHERE 
+        DATA_DT = TO_DATE('#XG_PM_SELECTION_DATE#','YYYYMMDD')
+        AND SRC_DL = '#XG_PM_SRC_DL#'
+),
+ORA_read_EWM_AR_X_AR_R AS (
+    SELECT 
+        SRC_DL,
+        OBJ_AR_ID,
+        SUBJ_AR_ID,
+        EFF_DT,
+        AR_X_AR_RLTNP_TP_CL_CD
+    FROM
+        #XG_PS_RDB_DM_MPSCR_Database.$XG_RDB_DM_SCHEMA_MPSCR#.EWM_AR_X_AR_R
+    WHERE 
+        SRC_DL = '#XG_PM_SRC_DL#'
+        AND VLD_FROM_TMS <= TO_DATE('#XG_PM_SELECTION_DATE##XG_PM_BUSINESS_TMS#' , 'YYYYMMDDHH24MISS')
+        AND TO_DATE('#XG_PM_SELECTION_DATE##XG_PM_BUSINESS_TMS#' , 'YYYYMMDDHH24MISS') < VLD_TO_TMS
+),
+FLT_AR_RLTNP_TP_CD AS (
+    SELECT
+        *
+    FROM
+        V438S7P1
+    WHERE
+        AR_X_AR_RLTNP_TP_CL_CD = 'SPSDG_AR'
+),
+ORA_read_EWM_MDM_STAGE_FCY_AR AS (
+    SELECT 
+        SRC_DL,
+        AR_ID,
+        FCY_RK
+    FROM
+        #XG_PS_RDB_DM_MPSCR_Database.$XG_RDB_DM_SCHEMA_MPSCR#.EWM_MDM_STAGE_FCY_AR
+    WHERE 
+        DATA_DT = TO_DATE('#XG_PM_SELECTION_DATE#','YYYYMMDD')
+        AND SRC_DL = '#XG_PM_SRC_DL#'
+),
+SRT_MPS_AR_IDENTN AS (
+    SELECT
+        *
+    FROM
+        V438S9P1
+    ORDER BY
+        SRC_DL, AR_ID
+),
+SRT_FCY_AR AS (
+    SELECT
+        *
+    FROM
+        V438S10P1
+    ORDER BY
+        SRC_DL, AR_ID
+),
+SRT_FCY_AR_HGHST AS (
+    SELECT
+        *
+    FROM
+        V438S11P1
+    ORDER BY
+        SRC_DL, HIGHEST_FCY_ID
+),
+SRT_HGST_FCY_AR AS (
+    SELECT
+        *
+    FROM
+        V438S12P1
+    ORDER BY
+        SRC_DL, HIGHEST_FCY_ID
+)
+SELECT
+    DATA_DT,
+    OBJ_AR_ID AS FCY_ID,
+    MSTR_SRC_STM_CD AS SRC_STM_ID,
+    mov_FCY_AR_IDENTN.SYS_VLD_FROM_TMS AS DATE_FROM,
+    AR_ID,
+    VLD_TO_TMS AS DATE_TO,
+    SRC_DL,
+    FCY_RK
+FROM
+    ORA_read_EWM_MDM_STAGE_FCY_AR_IP_JDCL_EV
+    JOIN ORA_read_EWM_AR_X_AR_R ON ORA_read_EWM_MDM_STAGE_FCY_AR_IP_JDCL_EV.SRC_DL = ORA_read_EWM_AR_X_AR_R.SRC_DL
+    JOIN ORA_read_EWM_MDM_STAGE_FCY_AR ON ORA_read_EWM_MDM_STAGE_FCY_AR_IP_JDCL_EV.SRC_DL = ORA_read_EWM_MDM_STAGE_FCY_AR.SRC_DL
+    JOIN FLT_AR_RLTNP_TP_CD ON ORA_read_EWM_AR_X_AR_R.SRC_DL = FLT_AR_RLTNP_TP_CD.SRC_DL
+    JOIN XFM_HIGHEST_FACILITY ON ORA_read_EWM_AR_X_AR_R.SRC_DL = XFM_HIGHEST_FACILITY.AR_ID;

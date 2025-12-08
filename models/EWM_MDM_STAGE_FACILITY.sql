@@ -1,94 +1,30 @@
-WITH EWM_MDM_STAGE_FCY_AR_IP_JDCL AS (
-    SELECT 
-        SRC_DL,
-        DATA_DT,
-        VLD_FROM_TMS,
-        VLD_TO_TMS,
-        SRC_STM_ID,
-        FCY_ID,
-        FCY_RK,
-        AR_ID,
-        FCY_AR_TP,
-        COURT_CTRLD_WRKOUT_FCY,
-        OUT_OF_COURT_WRKOUT_FCY,
-        COURT_CTRLD_WRKOUT_FILL_DT,
-        COURT_CTRLD_WRKOUT_CLS_DT,
-        CR_OBLG_DFLTD,
-        UNDRL_AR_ID
-    FROM 
-        #XG_PS_RDB_DM_MPSCR_Database.$XG_RDB_DM_SCHEMA_MPSCR#.EWM_MDM_STAGE_FCY_AR_IP_JDCL
-    WHERE 
-        DATA_DT = TO_DATE('#XG_PM_SELECTION_DATE#','YYYYMMDD') 
-        AND SRC_DL = '#XG_PM_SRC_DL#'
+WITH remdup_stage AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (PARTITION BY SRC_DL, AR_ID ORDER BY SRC_DL, AR_ID) AS row_num
+    FROM V438S0P1
+    QUALIFY row_num = 1
 ),
-EWM_AR_X_AR_R AS (
-    SELECT 
-        SRC_DL,
-        OBJ_AR_ID,
-        SUBJ_AR_ID,
-        EFF_DT,
-        AR_X_AR_RLTNP_TP_CL_CD
-    FROM 
-        #XG_PS_RDB_DM_MPSCR_Database.$XG_RDB_DM_SCHEMA_MPSCR#.EWM_AR_X_AR_R
-    WHERE 
-        SRC_DL='#XG_PM_SRC_DL#' 
-        AND VLD_FROM_TMS<= TO_DATE('#XG_PM_SELECTION_DATE##XG_PM_BUSINESS_TMS#' , 'YYYYMMDDHH24MISS') 
-        AND TO_DATE('#XG_PM_SELECTION_DATE##XG_PM_BUSINESS_TMS#' , 'YYYYMMDDHH24MISS') < VLD_TO_TMS
+join_stage AS (
+    SELECT
+        *
+    FROM V438S1P1
+    LEFT OUTER JOIN V438S1P2
+    ON V438S1P1.SRC_DL = V438S1P2.SRC_DL AND V438S1P1.AR_ID = V438S1P2.AR_ID
 ),
-EWM_MDM_STAGE_FCY_AR AS (
-    SELECT 
-        SRC_DL,
-        AR_ID,
-        FCY_RK
-    FROM 
-        #XG_PS_RDB_DM_MPSCR_Database.$XG_RDB_DM_SCHEMA_MPSCR#.EWM_MDM_STAGE_FCY_AR
-    WHERE 
-        DATA_DT = TO_DATE('#XG_PM_SELECTION_DATE#','YYYYMMDD') 
-        AND SRC_DL = '#XG_PM_SRC_DL#'
+transform_stage AS (
+    SELECT
+        mov_AR_X_R_HIGHEST.HIGHEST_FCY_ID AS AR_ID,
+        'Y' AS HIGHEST_FCY_IN_HRY
+    FROM V438S2P1 AS mov_AR_X_R_HIGHEST
 ),
-EWM_AR_IDENTN_M AS (
-    SELECT 
-        AR_ID,
-        AR_IDENTN_NM,
-        SRC_DL
-    FROM 
-        #XG_PS_RDB_DM_MPSCR_Database.$XG_RDB_DM_SCHEMA_MPSCR#.EWM_AR_IDENTN_M
-    WHERE 
-        SRC_DL='#XG_PM_SRC_DL#' 
-        AND VLD_FROM_TMS<= TO_DATE('#XG_PM_SELECTION_DATE##XG_PM_BUSINESS_TMS#' , 'YYYYMMDDHH24MISS') 
-        AND TO_DATE('#XG_PM_SELECTION_DATE##XG_PM_BUSINESS_TMS#' , 'YYYYMMDDHH24MISS') < VLD_TO_TMS 
-        AND AR_IDENTN_TP_CL_CD = 'LCL_VORTEX_IDENT'
-),
-joined_data AS (
-    SELECT 
-        jd.*,
-        ar.OBJ_AR_ID AS FCY_ID,
-        ar.SUBJ_AR_ID,
-        ar.EFF_DT,
-        ar.AR_X_AR_RLTNP_TP_CL_CD,
-        ar_m.AR_IDENTN_NM,
-        ar_m.SRC_DL AS ar_m_SRC_DL,
-        ar_fcy.AR_ID AS fcy_AR_ID,
-        ar_fcy.FCY_RK AS fcy_FCY_RK
-    FROM 
-        EWM_MDM_STAGE_FCY_AR_IP_JDCL jd
-    LEFT JOIN 
-        EWM_AR_X_AR_R ar 
-    ON 
-        jd.SRC_DL = ar.SRC_DL 
-        AND jd.AR_ID = ar.OBJ_AR_ID
-    LEFT JOIN 
-        EWM_MDM_STAGE_FCY_AR ar_fcy 
-    ON 
-        jd.SRC_DL = ar_fcy.SRC_DL 
-        AND jd.AR_ID = ar_fcy.AR_ID
-    LEFT JOIN 
-        EWM_AR_IDENTN_M ar_m 
-    ON 
-        jd.SRC_DL = ar_m.SRC_DL 
-        AND jd.AR_ID = ar_m.AR_ID
+sort_stage AS (
+    SELECT
+        *
+    FROM V438S3P1
+    ORDER BY SRC_DL ASC, AR_ID ASC
 )
-SELECT 
+SELECT
     DATA_DT,
     OBJ_AR_ID AS FCY_ID,
     MSTR_SRC_STM_CD AS SRC_STM_ID,
@@ -98,23 +34,19 @@ SELECT
     SRC_DL,
     FCY_RK,
     FCY_AR_TP,
-    IFNULL(mov_FCY_AR_IDENTN.HIGHER_FCY_RK, mov_FCY_AR_IDENTN.FCY_RK) AS HIGHER_FCY_RK,
-    IFNULL(mov_FCY_AR_IDENTN.HIGHEST_FCY_RK, mov_FCY_AR_IDENTN.FCY_RK) AS HIGHEST_FCY_RK,
-    CASE 
-        WHEN mov_FCY_AR_IDENTN.HLEAF = 1 THEN 'Y' 
-        WHEN mov_FCY_AR_IDENTN.HLEAF = 0 THEN 'N' 
-        ELSE 
-            CASE 
-                WHEN mov_FCY_AR_IDENTN.HIGHEST_FCY_IN_HRY = 'Y' THEN 'N' 
-                ELSE 'Y' 
-            END 
-    END AS LOWEST_LVL_IND,
+    CASE WHEN mov_FCY_AR_IDENTN.HIGHER_FCY_RK IS NULL THEN mov_FCY_AR_IDENTN.FCY_RK ELSE mov_FCY_AR_IDENTN.HIGHER_FCY_RK END AS HIGHER_FCY_RK,
+    CASE WHEN mov_FCY_AR_IDENTN.HIGHEST_FCY_RK IS NULL THEN mov_FCY_AR_IDENTN.FCY_RK ELSE mov_FCY_AR_IDENTN.HIGHEST_FCY_RK END AS HIGHEST_FCY_RK,
+    CASE WHEN mov_FCY_AR_IDENTN.HLEAF = 1 THEN 'Y' WHEN mov_FCY_AR_IDENTN.HLEAF = 0 THEN 'N' ELSE CASE WHEN mov_FCY_AR_IDENTN.HIGHEST_FCY_IN_HRY = 'Y' THEN 'N' ELSE 'Y' END END AS LOWEST_LVL_IND,
+    FCY_RK AS SPSDG_FCY_RK,
     COURT_CTRLD_WRKOUT_FILL_DT,
     COURT_CTRLD_WRKOUT_FCY,
     OUT_OF_COURT_WRKOUT_FCY,
+    mov_FCY_AR_IDENTN.SPSDG_FCY_DT AS SPSDG_FCY_DT,
+    COURT_CTRLD_WRKOUT_CLS_DT,
+    CR_OBLG_DFLTD,
     mov_FCY_AR_IDENTN.AR_IDENTN_NM AS FCY_VORTEX_ID,
     CURRENT_TIMESTAMP() AS SYS_INRT_TMS
-FROM 
-    joined_data
-QUALIFY 
-    ROW_NUMBER() OVER (PARTITION BY SRC_DL, AR_ID ORDER BY VLD_FROM_TMS DESC) = 1;
+FROM join_stage
+JOIN remdup_stage ON join_stage.SRC_DL = remdup_stage.SRC_DL AND join_stage.AR_ID = remdup_stage.AR_ID
+JOIN transform_stage ON remdup_stage.AR_ID = transform_stage.AR_ID
+JOIN sort_stage ON transform_stage.AR_ID = sort_stage.AR_ID

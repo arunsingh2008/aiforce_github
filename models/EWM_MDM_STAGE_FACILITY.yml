@@ -1,0 +1,57 @@
+version: 2
+
+models:
+  - name: EWM_MDM_STAGE_FACILITY
+    description: "DBT model for EWM_MDM_STAGE_FACILITY"
+    tags:
+      - ewm
+      - mdm
+      - stage
+      - facility
+    columns:
+      - name: DATA_DT
+        description: "one=one"
+      - name: FCY_ID
+        description: "one=one\nDerived(renamed)"
+      - name: SRC_STM_ID
+        description: "one=one\nDerived(renamed)"
+      - name: DATE_FROM
+        description: "Derived(renamed)"
+      - name: AR_ID
+        description: "one=one"
+      - name: DATE_TO
+        description: "One-One"
+      - name: SRC_DL
+        description: "one=one"
+      - name: FCY_RK
+        description: "one=one"
+      - name: FCY_AR_TP
+        description: "one=one"
+      - name: HIGHER_FCY_RK
+        description: "Derived"
+      - name: HIGHEST_FCY_RK
+        description: "Derived"
+      - name: LOWEST_LVL_IND
+        description: "Derived"
+      - name: SPSDG_FCY_RK
+        description: "Derived"
+      - name: COURT_CTRLD_WRKOUT_FILL_DT
+        description: "one=one"
+      - name: COURT_CTRLD_WRKOUT_FCY
+        description: "one=one"
+      - name: OUT_OF_COURT_WRKOUT_FCY
+        description: "one=one"
+      - name: SPSDG_FCY_DT
+        description: "Derived"
+      - name: COURT_CTRLD_WRKOUT_CLS_DT
+        description: "one=one"
+      - name: CR_OBLG_DFLTD
+        description: "one=one"
+      - name: FCY_VORTEX_ID
+        description: "Derived"
+      - name: SYS_INRT_TMS
+        description: "Derived"
+    materialized: table
+    unique_keys:
+      - SRC_DL
+      - AR_ID

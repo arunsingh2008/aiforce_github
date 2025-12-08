@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: EWM_MDM_STAGE_FACILITY
+    description: "DBT model for EWM_MDM_STAGE_FACILITY"
+    tags:
+      - EWM
+      - MDM
+      - STAGE
+      - FACILITY
+    columns:
+      - name: DATA_DT
+        description: "one=one"
+      - name: FCY_ID
+        description: "Derived(renamed) OBJ_AR_ID AS FCY_ID"
+      - name: SRC_STM_ID
+        description: "Derived(renamed) MSTR_SRC_STM_CD AS SRC_STM_ID"
+    config:
+      materialized: table
+    unique_keys:
+      - SRC_DL
+      - AR_ID

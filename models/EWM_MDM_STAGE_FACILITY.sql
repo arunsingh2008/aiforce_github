@@ -1,0 +1,120 @@
+WITH EWM_MDM_STAGE_FCY_AR_IP_JDCL AS (
+    SELECT 
+        SRC_DL,
+        DATA_DT,
+        VLD_FROM_TMS,
+        VLD_TO_TMS,
+        SRC_STM_ID,
+        FCY_ID,
+        FCY_RK,
+        AR_ID,
+        FCY_AR_TP,
+        COURT_CTRLD_WRKOUT_FCY,
+        OUT_OF_COURT_WRKOUT_FCY,
+        COURT_CTRLD_WRKOUT_FILL_DT,
+        COURT_CTRLD_WRKOUT_CLS_DT,
+        CR_OBLG_DFLTD,
+        UNDRL_AR_ID
+    FROM 
+        #XG_PS_RDB_DM_MPSCR_Database.$XG_RDB_DM_SCHEMA_MPSCR#.EWM_MDM_STAGE_FCY_AR_IP_JDCL
+    WHERE 
+        DATA_DT = TO_DATE('#XG_PM_SELECTION_DATE#','YYYYMMDD') 
+        AND SRC_DL = '#XG_PM_SRC_DL#'
+),
+EWM_AR_X_AR_R AS (
+    SELECT 
+        SRC_DL,
+        OBJ_AR_ID,
+        SUBJ_AR_ID,
+        EFF_DT,
+        AR_X_AR_RLTNP_TP_CL_CD
+    FROM 
+        #XG_PS_RDB_DM_MPSCR_Database.$XG_RDB_DM_SCHEMA_MPSCR#.EWM_AR_X_AR_R
+    WHERE 
+        SRC_DL='#XG_PM_SRC_DL#' 
+        AND VLD_FROM_TMS<= TO_DATE('#XG_PM_SELECTION_DATE##XG_PM_BUSINESS_TMS#' , 'YYYYMMDDHH24MISS') 
+        AND TO_DATE('#XG_PM_SELECTION_DATE##XG_PM_BUSINESS_TMS#' , 'YYYYMMDDHH24MISS') < VLD_TO_TMS
+),
+EWM_MDM_STAGE_FCY_AR AS (
+    SELECT 
+        SRC_DL,
+        AR_ID,
+        FCY_RK
+    FROM 
+        #XG_PS_RDB_DM_MPSCR_Database.$XG_RDB_DM_SCHEMA_MPSCR#.EWM_MDM_STAGE_FCY_AR
+    WHERE 
+        DATA_DT = TO_DATE('#XG_PM_SELECTION_DATE#','YYYYMMDD') 
+        AND SRC_DL = '#XG_PM_SRC_DL#'
+),
+EWM_AR_IDENTN_M AS (
+    SELECT 
+        AR_ID,
+        AR_IDENTN_NM,
+        SRC_DL
+    FROM 
+        #XG_PS_RDB_DM_MPSCR_Database.$XG_RDB_DM_SCHEMA_MPSCR#.EWM_AR_IDENTN_M
+    WHERE 
+        SRC_DL='#XG_PM_SRC_DL#' 
+        AND VLD_FROM_TMS<= TO_DATE('#XG_PM_SELECTION_DATE##XG_PM_BUSINESS_TMS#' , 'YYYYMMDDHH24MISS') 
+        AND TO_DATE('#XG_PM_SELECTION_DATE##XG_PM_BUSINESS_TMS#' , 'YYYYMMDDHH24MISS') < VLD_TO_TMS 
+        AND AR_IDENTN_TP_CL_CD = 'LCL_VORTEX_IDENT'
+),
+joined_data AS (
+    SELECT 
+        jd.*,
+        ar.OBJ_AR_ID AS FCY_ID,
+        ar.SUBJ_AR_ID,
+        ar.EFF_DT,
+        ar.AR_X_AR_RLTNP_TP_CL_CD,
+        ar_m.AR_IDENTN_NM,
+        ar_m.SRC_DL AS ar_m_SRC_DL,
+        ar_fcy.AR_ID AS fcy_AR_ID,
+        ar_fcy.FCY_RK AS fcy_FCY_RK
+    FROM 
+        EWM_MDM_STAGE_FCY_AR_IP_JDCL jd
+    LEFT JOIN 
+        EWM_AR_X_AR_R ar 
+    ON 
+        jd.SRC_DL = ar.SRC_DL 
+        AND jd.AR_ID = ar.OBJ_AR_ID
+    LEFT JOIN 
+        EWM_MDM_STAGE_FCY_AR ar_fcy 
+    ON 
+        jd.SRC_DL = ar_fcy.SRC_DL 
+        AND jd.AR_ID = ar_fcy.AR_ID
+    LEFT JOIN 
+        EWM_AR_IDENTN_M ar_m 
+    ON 
+        jd.SRC_DL = ar_m.SRC_DL 
+        AND jd.AR_ID = ar_m.AR_ID
+)
+SELECT 
+    DATA_DT,
+    OBJ_AR_ID AS FCY_ID,
+    MSTR_SRC_STM_CD AS SRC_STM_ID,
+    mov_FCY_AR_IDENTN.SYS_VLD_FROM_TMS AS DATE_FROM,
+    AR_ID,
+    VLD_TO_TMS AS DATE_TO,
+    SRC_DL,
+    FCY_RK,
+    FCY_AR_TP,
+    IFNULL(mov_FCY_AR_IDENTN.HIGHER_FCY_RK, mov_FCY_AR_IDENTN.FCY_RK) AS HIGHER_FCY_RK,
+    IFNULL(mov_FCY_AR_IDENTN.HIGHEST_FCY_RK, mov_FCY_AR_IDENTN.FCY_RK) AS HIGHEST_FCY_RK,
+    CASE 
+        WHEN mov_FCY_AR_IDENTN.HLEAF = 1 THEN 'Y' 
+        WHEN mov_FCY_AR_IDENTN.HLEAF = 0 THEN 'N' 
+        ELSE 
+            CASE 
+                WHEN mov_FCY_AR_IDENTN.HIGHEST_FCY_IN_HRY = 'Y' THEN 'N' 
+                ELSE 'Y' 
+            END 
+    END AS LOWEST_LVL_IND,
+    COURT_CTRLD_WRKOUT_FILL_DT,
+    COURT_CTRLD_WRKOUT_FCY,
+    OUT_OF_COURT_WRKOUT_FCY,
+    mov_FCY_AR_IDENTN.AR_IDENTN_NM AS FCY_VORTEX_ID,
+    CURRENT_TIMESTAMP() AS SYS_INRT_TMS
+FROM 
+    joined_data
+QUALIFY 
+    ROW_NUMBER() OVER (PARTITION BY SRC_DL, AR_ID ORDER BY VLD_FROM_TMS DESC) = 1;

@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: #XG_PS_RDB_DM_MPSCR_Database.$XG_RDB_DM_SCHEMA_MPSCR#.#XG_PM_TGTTBL#
+    description: "DBT model for #XG_PS_RDB_DM_MPSCR_Database.$XG_RDB_DM_SCHEMA_MPSCR#.#XG_PM_TGTTBL#"
+    columns:
+      - name: SRC_DL
+        description: "One-One"
+      - name: EV_ID
+        description: "One-One"
+      - name: MSTR_SRC_STM_CD
+        description: "One-One"
+      - name: MSTR_SRC_STM_KEY
+        description: "One-One"
+      - name: VLD_FROM_TMS
+        description: "One-One"
+      - name: VLD_TO_TMS
+        description: "One-One"
+      - name: PRIM_AR_ID
+        description: "One-One"
+    tags:
+      - XG
+      - DM
+      - MPSCR
+      - JP
+      - EWM
+      - MDM
+      - STAGE
+      - TXN
+      - FCY
+      - RK
+      - AGRMT
+    meta:
+      materialization: table
+      unique_keys:
+        - SRC_DL
+        - PRIM_AR_ID
+        - FCY_RK
+        - MSTR_SRC_STM_KEY

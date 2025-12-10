@@ -1,0 +1,37 @@
+{
+  "source_tables": [
+    "EWM_MDM_STAGE_FCY_AR_IP_JDCL",
+    "EWM_AR_X_AR_R",
+    "EWM_MDM_STAGE_FCY_AR",
+    "EWM_AR_IDENTN_M"
+  ],
+  "target_table": "EWM_MDM_STAGE_FACILITY",
+  "transformations": [
+    "dedup",
+    "join",
+    "transform"
+  ],
+  "columns": [
+    "DATA_DT",
+    "FCY_ID",
+    "SRC_STM_ID",
+    "DATE_FROM",
+    "AR_ID",
+    "DATE_TO",
+    "SRC_DL",
+    "FCY_RK",
+    "FCY_AR_TP",
+    "HIGHER_FCY_RK",
+    "HIGHEST_FCY_RK",
+    "LOWEST_LVL_IND",
+    "SPSDG_FCY_RK",
+    "COURT_CTRLD_WRKOUT_FILL_DT",
+    "COURT_CTRLD_WRKOUT_FCY",
+    "OUT_OF_COURT_WRKOUT_FCY",
+    "SPSDG_FCY_DT",
+    "COURT_CTRLD_WRKOUT_CLS_DT",
+    "CR_OBLG_DFLTD",
+    "FCY_VORTEX_ID",
+    "SYS_INRT_TMS"
+  ]
+}
